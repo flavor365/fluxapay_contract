@@ -27,8 +27,7 @@ jobs:
       environment_name: "development"
       stellar_network: "testnet"
       retention_days: 30
-    secrets:
-      stellar_secret_key: ${{ secrets.STELLAR_SECRET_KEY_DEV }}
+    secrets: inherit
 
   # Deploy to staging environment (automatic on main push, after dev)
   deploy-staging:
@@ -43,8 +42,7 @@ jobs:
       environment_name: "staging"
       stellar_network: "testnet"
       retention_days: 90
-    secrets:
-      stellar_secret_key: ${{ secrets.STELLAR_SECRET_KEY_STAGING }}
+    secrets: inherit
 
   # Deploy to production (manual trigger only)
   deploy-production:
@@ -55,5 +53,4 @@ jobs:
       stellar_network: "mainnet"
       retention_days: 365
       is_production: true
-    secrets:
-      stellar_secret_key: ${{ secrets.STELLAR_SECRET_KEY_PROD }}
+    secrets: inherit

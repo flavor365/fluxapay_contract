@@ -17,9 +17,6 @@ on:
         required: false
         type: boolean
         default: false
-    secrets:
-      stellar_secret_key:
-        required: true
 
 jobs:
   deploy:
@@ -83,7 +80,7 @@ jobs:
       - name: Deploy to Stellar ${{ inputs.stellar_network }}
         env:
           STELLAR_NETWORK: ${{ inputs.stellar_network }}
-          STELLAR_SECRET_KEY: ${{ secrets.stellar_secret_key }}
+          STELLAR_SECRET_KEY: ${{ secrets.STELLAR_SECRET_KEY }}
         run: |
           echo "Deploying fluxapay to Stellar ${{ inputs.stellar_network }}"
           # Using environment variables for secrets is safer than shell arguments
