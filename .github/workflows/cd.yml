@@ -5,7 +5,7 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
-      environment:
+      target-environment:
         description: "Deployment environment"
         required: true
         type: choice
@@ -27,7 +27,7 @@ jobs:
   # Deploy to development environment (automatic on main push)
   deploy-dev:
     name: Deploy to Development
-    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'development')
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.target-environment == 'development')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment:
@@ -101,7 +101,10 @@ jobs:
   deploy-staging:
     name: Deploy to Staging
     needs: [deploy-dev]
-    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
+    if: |
+      always() && 
+      ((github.event_name == 'push' && needs.deploy-dev.result == 'success') || 
+       (github.event_name == 'workflow_dispatch' && github.event.inputs.target-environment == 'staging'))
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment:
@@ -174,7 +177,7 @@ jobs:
   # Deploy to production (manual trigger only, requires approval)
   deploy-production:
     name: Deploy to Production
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.target-environment == 'production'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment:
