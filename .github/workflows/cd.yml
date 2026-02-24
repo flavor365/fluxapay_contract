@@ -15,234 +15,45 @@ on:
           - production
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
   deployments: write
-
-env:
-  CARGO_TERM_COLOR: always
-  RUST_BACKTRACE: 1
 
 jobs:
   # Deploy to development environment (automatic on main push)
   deploy-dev:
-    name: Deploy to Development
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.target-environment == 'development')
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    environment:
-      name: "development"
-      url: https://stellar.expert/explorer/testnet
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-
-      - name: Cache Stellar CLI
-        uses: actions/cache@v4
-        id: cache-stellar-cli-dev
-        with:
-          path: ~/.cargo/bin/stellar
-          key: ${{ runner.os }}-stellar-cli-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Install system dependencies
-        if: steps.cache-stellar-cli-dev.outputs.cache-hit != 'true'
-        run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config
-
-      - name: Install Stellar CLI
-        if: steps.cache-stellar-cli-dev.outputs.cache-hit != 'true'
-        run: |
-          cargo install --locked stellar-cli
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-
-      - name: Verify Stellar CLI
-        run: stellar --version
-
-      - name: Cache cargo
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-deploy-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-deploy-
-
-      - name: Build contract (optimized)
-        working-directory: fluxapay
-        run: stellar contract build
-
-      - name: Deploy to Stellar Testnet (Dev)
-        env:
-          STELLAR_NETWORK: testnet
-          STELLAR_SECRET_KEY: ${{ secrets.STELLAR_SECRET_KEY_DEV }}
-        run: |
-          echo "Deploying to Stellar Testnet (Development)"
-          # Uncomment to enable actual deployment:
-          # stellar contract deploy \
-          #   --wasm target/wasm32-unknown-unknown/release/*.wasm \
-          #   --network testnet \
-          #   --source $STELLAR_SECRET_KEY
-          echo "Contract deployed successfully to development"
-
-      - name: Upload deployment artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: deployment-dev-${{ github.sha }}
-          path: target/wasm32-unknown-unknown/release/*.wasm
-          retention-days: 30
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment_name: "development"
+      stellar_network: "testnet"
+      retention_days: 30
+    secrets:
+      stellar_secret_key: ${{ secrets.STELLAR_SECRET_KEY_DEV }}
 
   # Deploy to staging environment (automatic on main push, after dev)
   deploy-staging:
-    name: Deploy to Staging
     needs: [deploy-dev]
+    # Run if on main push (after dev) OR if manually triggered for staging
     if: |
       always() && 
       ((github.event_name == 'push' && needs.deploy-dev.result == 'success') || 
        (github.event_name == 'workflow_dispatch' && github.event.inputs.target-environment == 'staging'))
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    environment:
-      name: "staging"
-      url: https://stellar.expert/explorer/testnet
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment_name: "staging"
+      stellar_network: "testnet"
+      retention_days: 90
+    secrets:
+      stellar_secret_key: ${{ secrets.STELLAR_SECRET_KEY_STAGING }}
 
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-
-      - name: Cache Stellar CLI
-        uses: actions/cache@v4
-        id: cache-stellar-cli-staging
-        with:
-          path: ~/.cargo/bin/stellar
-          key: ${{ runner.os }}-stellar-cli-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Install system dependencies
-        if: steps.cache-stellar-cli-staging.outputs.cache-hit != 'true'
-        run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config
-
-      - name: Install Stellar CLI
-        if: steps.cache-stellar-cli-staging.outputs.cache-hit != 'true'
-        run: |
-          cargo install --locked stellar-cli
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-
-      - name: Verify Stellar CLI
-        run: stellar --version
-
-      - name: Cache cargo
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-deploy-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-deploy-
-
-      - name: Build contract (optimized)
-        working-directory: fluxapay
-        run: stellar contract build
-
-      - name: Deploy to Stellar Testnet (Staging)
-        env:
-          STELLAR_NETWORK: testnet
-          STELLAR_SECRET_KEY: ${{ secrets.STELLAR_SECRET_KEY_STAGING }}
-        run: |
-          echo "Deploying to Stellar Testnet (Staging)"
-          # Uncomment to enable actual deployment:
-          # stellar contract deploy \
-          #   --wasm target/wasm32-unknown-unknown/release/*.wasm \
-          #   --network testnet \
-          #   --source $STELLAR_SECRET_KEY
-          echo "Contract deployed successfully to staging"
-
-      - name: Upload deployment artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: deployment-staging-${{ github.sha }}
-          path: target/wasm32-unknown-unknown/release/*.wasm
-          retention-days: 90
-
-  # Deploy to production (manual trigger only, requires approval)
+  # Deploy to production (manual trigger only)
   deploy-production:
-    name: Deploy to Production
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.target-environment == 'production'
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    environment:
-      name: "production"
-      url: https://stellar.expert/explorer/public
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-
-      - name: Cache Stellar CLI
-        uses: actions/cache@v4
-        id: cache-stellar-cli-prod
-        with:
-          path: ~/.cargo/bin/stellar
-          key: ${{ runner.os }}-stellar-cli-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Install system dependencies
-        if: steps.cache-stellar-cli-prod.outputs.cache-hit != 'true'
-        run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config
-
-      - name: Install Stellar CLI
-        if: steps.cache-stellar-cli-prod.outputs.cache-hit != 'true'
-        run: |
-          cargo install --locked stellar-cli
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-
-      - name: Verify Stellar CLI
-        run: stellar --version
-
-      - name: Cache cargo
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-deploy-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-deploy-
-
-      - name: Build contract (optimized)
-        working-directory: fluxapay
-        run: stellar contract build
-
-      - name: Deploy to Stellar Mainnet (Production)
-        env:
-          STELLAR_NETWORK: mainnet
-          STELLAR_SECRET_KEY: ${{ secrets.STELLAR_SECRET_KEY_PROD }}
-        run: |
-          echo "Deploying to Stellar Mainnet (Production)"
-          # Uncomment to enable actual deployment:
-          # stellar contract deploy \
-          #   --wasm target/wasm32-unknown-unknown/release/*.wasm \
-          #   --network mainnet \
-          #   --source $STELLAR_SECRET_KEY
-          echo "Contract deployed successfully to production"
-
-      - name: Upload deployment artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: deployment-production-${{ github.sha }}
-          path: target/wasm32-unknown-unknown/release/*.wasm
-          retention-days: 365
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment_name: "production"
+      stellar_network: "mainnet"
+      retention_days: 365
+      is_production: true
+    secrets:
+      stellar_secret_key: ${{ secrets.STELLAR_SECRET_KEY_PROD }}
