@@ -254,6 +254,7 @@ impl RefundManager {
     }
 
     pub fn process_refund(env: Env, operator: Address, refund_id: String) -> Result<(), Error> {
+        operator.require_auth();
         let has_settlement =
             AccessControl::has_role(&env, &role_settlement_operator(&env), &operator);
         let has_oracle = AccessControl::has_role(&env, &role_oracle(&env), &operator);
@@ -558,6 +559,19 @@ impl RefundManager {
 
 #[contractimpl]
 impl PaymentProcessor {
+    pub fn initialize_payment_processor(env: Env, admin: Address) {
+        AccessControl::initialize(&env, admin);
+    }
+
+    pub fn grant_role(
+        env: Env,
+        admin: Address,
+        role: Symbol,
+        account: Address,
+    ) -> Result<(), Error> {
+        AccessControl::grant_role(&env, admin, role, account).map_err(|_| Error::AccessControlError)
+    }
+
     #[allow(deprecated)]
     pub fn create_payment(
         env: Env,
@@ -615,11 +629,20 @@ impl PaymentProcessor {
     #[allow(deprecated)]
     pub fn verify_payment(
         env: Env,
+        oracle: Address,
         payment_id: String,
         transaction_hash: BytesN<32>,
         payer_address: Address,
         amount_received: i128,
     ) -> Result<PaymentStatus, Error> {
+        oracle.require_auth();
+
+        if !AccessControl::has_role(&env, &role_oracle(&env), &oracle)
+            && !AccessControl::has_role(&env, &role_settlement_operator(&env), &oracle)
+        {
+            return Err(Error::Unauthorized);
+        }
+
         let mut payment = Self::get_payment_internal(&env, &payment_id)?;
 
         if payment.status != PaymentStatus::Pending {
@@ -704,4 +727,6 @@ mod dispute_test;
 pub mod merchant_registry;
 #[cfg(test)]
 mod merchant_registry_test;
+#[cfg(test)]
+mod auth_test;
 mod test;
