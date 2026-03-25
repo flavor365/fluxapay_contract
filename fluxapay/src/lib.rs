@@ -5,7 +5,9 @@ use soroban_sdk::{
 };
 
 mod access_control;
+pub mod fx_oracle;
 use access_control::{role_oracle, role_settlement_operator, AccessControl};
+use fx_oracle::{FXOracle, FXOracleClient, FXOracleError, RateData};
 
 #[contract]
 pub struct PaymentProcessor;
@@ -695,6 +697,8 @@ pub mod merchant_registry;
 mod merchant_registry_test;
 #[cfg(test)]
 mod integration_test;
+#[cfg(test)]
+mod fx_oracle_test;
 #[cfg(test)]
 mod auth_test;
 #[cfg(test)]
