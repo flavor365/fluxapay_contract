@@ -167,6 +167,16 @@ impl RefundManager {
         requester: Address,
     ) -> Result<String, Error> {
         requester.require_auth();
+        Self::create_refund_internal(&env, payment_id, refund_amount, reason, requester)
+    }
+
+    fn create_refund_internal(
+        env: &Env,
+        payment_id: String,
+        refund_amount: i128,
+        reason: String,
+        requester: Address,
+    ) -> Result<String, Error> {
 
         if refund_amount <= 0 {
             return Err(Error::InvalidAmount);
@@ -194,7 +204,7 @@ impl RefundManager {
             .persistent()
             .set(&DataKey::Refund(refund_id.clone()), &refund);
 
-        let mut payment_refunds = Self::get_payment_refunds_internal(&env, &payment_id);
+        let mut payment_refunds = Self::get_payment_refunds_internal(env, &payment_id);
         payment_refunds.push_back(refund_id.clone());
         env.storage()
             .persistent()
@@ -213,7 +223,15 @@ impl RefundManager {
             return Err(Error::Unauthorized);
         }
 
-        let mut refund = Self::get_refund_internal(&env, &refund_id)?;
+        Self::process_refund_internal(&env, &operator, refund_id)
+    }
+
+    fn process_refund_internal(
+        env: &Env,
+        _operator: &Address,
+        refund_id: String,
+    ) -> Result<(), Error> {
+        let mut refund = Self::get_refund_internal(env, &refund_id)?;
 
         if refund.status != RefundStatus::Pending {
             return Err(Error::RefundAlreadyProcessed);
@@ -367,8 +385,8 @@ impl RefundManager {
         // Create refund for the disputed amount
         let refund_reason = String::from_str(&env, "Refund issued due to dispute resolution");
 
-        let refund_id = Self::create_refund(
-            env.clone(),
+        let refund_id = Self::create_refund_internal(
+            &env,
             dispute.payment_id.clone(),
             dispute.amount,
             refund_reason,
@@ -376,7 +394,7 @@ impl RefundManager {
         )?;
 
         // Process the refund immediately
-        Self::process_refund(env.clone(), operator, refund_id.clone())?;
+        Self::process_refund_internal(&env, &operator, refund_id.clone())?;
 
         // Update dispute status
         dispute.status = DisputeStatus::Resolved;
