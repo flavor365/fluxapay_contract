@@ -1,7 +1,5 @@
 #![no_std]
-use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, Address, Env, Symbol,
-};
+use soroban_sdk::{contract, contracterror, contractimpl, contracttype, Address, Env, Symbol};
 
 use crate::access_control::{role_admin, role_oracle, AccessControl};
 
@@ -35,7 +33,9 @@ pub enum DataKey {
 impl FXOracle {
     pub fn initialize(env: Env, admin: Address, staleness_threshold: u64) {
         AccessControl::initialize(&env, admin);
-        env.storage().instance().set(&DataKey::StalenessThreshold, &staleness_threshold);
+        env.storage()
+            .instance()
+            .set(&DataKey::StalenessThreshold, &staleness_threshold);
     }
 
     pub fn grant_role(
@@ -44,7 +44,8 @@ impl FXOracle {
         role: Symbol,
         account: Address,
     ) -> Result<(), FXOracleError> {
-        AccessControl::grant_role(&env, admin, role, account).map_err(|_| FXOracleError::Unauthorized)
+        AccessControl::grant_role(&env, admin, role, account)
+            .map_err(|_| FXOracleError::Unauthorized)
     }
 
     pub fn has_role(env: Env, role: Symbol, account: Address) -> bool {
@@ -55,9 +56,15 @@ impl FXOracle {
         AccessControl::get_admin(&env)
     }
 
-    pub fn set_rate(env: Env, operator: Address, pair: Symbol, rate: i128, decimals: u32) -> Result<(), FXOracleError> {
+    pub fn set_rate(
+        env: Env,
+        operator: Address,
+        pair: Symbol,
+        rate: i128,
+        decimals: u32,
+    ) -> Result<(), FXOracleError> {
         operator.require_auth();
-        
+
         if !AccessControl::has_role(&env, &role_oracle(&env), &operator) {
             return Err(FXOracleError::Unauthorized);
         }
@@ -69,7 +76,9 @@ impl FXOracle {
             updated_at: env.ledger().timestamp(),
         };
 
-        env.storage().persistent().set(&DataKey::Rate(pair.clone()), &rate_data);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Rate(pair.clone()), &rate_data);
 
         // Emit event: (RATE, UPDATED), pair
         env.events().publish(
@@ -81,11 +90,18 @@ impl FXOracle {
     }
 
     pub fn get_rate(env: Env, pair: Symbol) -> Result<RateData, FXOracleError> {
-        let rate_data: RateData = env.storage().persistent().get(&DataKey::Rate(pair))
+        let rate_data: RateData = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Rate(pair))
             .ok_or(FXOracleError::RateNotFound)?;
 
-        let threshold: u64 = env.storage().instance().get(&DataKey::StalenessThreshold).unwrap_or(86400);
-        
+        let threshold: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::StalenessThreshold)
+            .unwrap_or(86400);
+
         if env.ledger().timestamp() > rate_data.updated_at + threshold {
             return Err(FXOracleError::RateStale);
         }
@@ -93,9 +109,13 @@ impl FXOracle {
         Ok(rate_data)
     }
 
-    pub fn get_settlement_amount(env: Env, usdc_amount: i128, target_currency: Symbol) -> Result<i128, FXOracleError> {
+    pub fn get_settlement_amount(
+        env: Env,
+        usdc_amount: i128,
+        target_currency: Symbol,
+    ) -> Result<i128, FXOracleError> {
         let rate_data = Self::get_rate(env.clone(), target_currency)?;
-        
+
         let mut divisor = 1i128;
         for _ in 0..rate_data.decimals {
             divisor *= 10;
@@ -105,17 +125,26 @@ impl FXOracle {
     }
 
     pub fn get_staleness_threshold(env: Env) -> u64 {
-        env.storage().instance().get(&DataKey::StalenessThreshold).unwrap_or(86400)
+        env.storage()
+            .instance()
+            .get(&DataKey::StalenessThreshold)
+            .unwrap_or(86400)
     }
 
-    pub fn set_staleness_threshold(env: Env, admin: Address, threshold: u64) -> Result<(), FXOracleError> {
+    pub fn set_staleness_threshold(
+        env: Env,
+        admin: Address,
+        threshold: u64,
+    ) -> Result<(), FXOracleError> {
         admin.require_auth();
-        
+
         if !AccessControl::has_role(&env, &role_admin(&env), &admin) {
             return Err(FXOracleError::Unauthorized);
         }
 
-        env.storage().instance().set(&DataKey::StalenessThreshold, &threshold);
+        env.storage()
+            .instance()
+            .set(&DataKey::StalenessThreshold, &threshold);
         Ok(())
     }
 }

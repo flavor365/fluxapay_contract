@@ -44,7 +44,7 @@ fn test_unauthorized_set_rate() {
 
     let unauthorized_user = Address::generate(&env);
     let pair = Symbol::new(&env, "USDC_NGN");
-    
+
     let result = client.try_set_rate(&unauthorized_user, &pair, &1000i128, &2);
     assert_eq!(result, Err(Ok(FXOracleError::Unauthorized)));
 }
@@ -62,7 +62,8 @@ fn test_staleness_check() {
     client.set_rate(&oracle, &pair, &1500i128, &0);
 
     // Jump forward 25 hours (threshold is 24)
-    env.ledger().set_timestamp(env.ledger().timestamp() + 25 * 3600);
+    env.ledger()
+        .set_timestamp(env.ledger().timestamp() + 25 * 3600);
 
     let result = client.try_get_rate(&pair);
     assert_eq!(result, Err(Ok(FXOracleError::RateStale)));
@@ -84,7 +85,7 @@ fn test_settlement_amount_calculation() {
     // 100 USDC -> 150050 NGN
     let usdc_amount = 100i128;
     let expected_fiat = 150050i128; // (100 * 150050) / 100
-    
+
     let amount = client.get_settlement_amount(&usdc_amount, &pair);
     assert_eq!(amount, expected_fiat);
 }
