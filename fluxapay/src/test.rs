@@ -146,6 +146,7 @@ fn test_initialize_contract() {
 #[test]
 fn test_grant_role() {
     let env = Env::default();
+    env.mock_all_auths();
     let (admin, client) = setup_refund_manager(&env);
     let account = Address::generate(&env);
     let role = role_oracle(&env);
@@ -157,6 +158,7 @@ fn test_grant_role() {
 #[test]
 fn test_transfer_admin() {
     let env = Env::default();
+    env.mock_all_auths();
     let (current_admin, client) = setup_refund_manager(&env);
     let new_admin = Address::generate(&env);
 
