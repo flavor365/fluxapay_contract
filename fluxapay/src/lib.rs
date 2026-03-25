@@ -34,6 +34,7 @@ pub struct PaymentCharge {
 pub enum PaymentStatus {
     Pending,
     Confirmed,
+    Settled,
     Expired,
     Failed,
 }
@@ -714,6 +715,39 @@ impl PaymentProcessor {
         Ok(())
     }
 
+    pub fn settle_payment(
+        env: Env,
+        operator: Address,
+        payment_id: String,
+        treasury_address: Address,
+    ) -> Result<(), Error> {
+        operator.require_auth();
+
+        if !AccessControl::has_role(&env, &role_settlement_operator(&env), &operator) {
+            return Err(Error::Unauthorized);
+        }
+
+        let mut payment = Self::get_payment_internal(&env, &payment_id)?;
+
+        if payment.status != PaymentStatus::Confirmed {
+            return Err(Error::PaymentAlreadyProcessed); // Or another appropriate error
+        }
+
+        payment.status = PaymentStatus::Settled;
+        payment.deposit_address = treasury_address; // "Sweep to treasury"
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::Payment(payment_id.clone()), &payment);
+
+        env.events().publish(
+            (Symbol::new(&env, "PAYMENT"), Symbol::new(&env, "SETTLED")),
+            payment_id,
+        );
+
+        Ok(())
+    }
+
     fn get_payment_internal(env: &Env, payment_id: &String) -> Result<PaymentCharge, Error> {
         env.storage()
             .persistent()
@@ -728,5 +762,6 @@ pub mod merchant_registry;
 #[cfg(test)]
 mod merchant_registry_test;
 #[cfg(test)]
+mod integration_test;
 mod auth_test;
 mod test;
