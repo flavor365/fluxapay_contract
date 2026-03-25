@@ -5,7 +5,9 @@ use soroban_sdk::{
 };
 
 mod access_control;
+pub mod fx_oracle;
 use access_control::{role_oracle, role_settlement_operator, AccessControl};
+use fx_oracle::{FXOracle, FXOracleClient, FXOracleError, RateData};
 
 #[contract]
 pub struct PaymentProcessor;
@@ -177,7 +179,6 @@ impl RefundManager {
         reason: String,
         requester: Address,
     ) -> Result<String, Error> {
-
         if refund_amount <= 0 {
             return Err(Error::InvalidAmount);
         }
@@ -474,7 +475,6 @@ impl RefundManager {
         format_id(env, "dispute_", counter)
     }
 
-
     fn get_dispute_internal(env: &Env, dispute_id: &String) -> Result<Dispute, Error> {
         env.storage()
             .persistent()
@@ -689,14 +689,16 @@ impl PaymentProcessor {
 }
 
 #[cfg(test)]
+mod auth_test;
+#[cfg(test)]
 mod dispute_test;
+#[cfg(test)]
+mod fx_oracle_test;
+#[cfg(test)]
+mod integration_test;
 pub mod merchant_registry;
 #[cfg(test)]
 mod merchant_registry_test;
-#[cfg(test)]
-mod integration_test;
-#[cfg(test)]
-mod auth_test;
 #[cfg(test)]
 mod proptests;
 mod test;
